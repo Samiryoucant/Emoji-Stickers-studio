@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unlimited Emoji & Stickers Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --accent: #ff6b35;
+            --text: #ffffff;
+            --text-secondary: #a1a1aa;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .neon-border {
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+            border: 1px solid var(--accent);
+        }
+        
+        .emoji-item {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .emoji-item:hover {
+            transform: scale(1.2) rotate(10deg);
+            filter: drop-shadow(0 0 10px var(--accent));
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
+        .bounce {
+            animation: bounce 0.6s ease;
+        }
+        
+        .sticker-preview {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .sticker-preview::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 107, 53, 0.3), transparent);
+            transform: rotate(45deg);
+            animation: shine 2s infinite;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+        
+        .category-tab {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .category-tab::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+        
+        .category-tab:hover::after,
+        .category-tab.active::after {
+            width: 100%;
+        }
+        
+        .floating-sticker {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            font-size: 2rem;
+            animation: float 3s ease-out forwards;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        .scroll-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), #ff8c42);
+            transform-origin: 0%;
+            transform: scaleX(0);
+            z-index: 1000;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 3px;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, var(--accent), #ff8c42);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="scroll-indicator" id="scrollIndicator"></div>
+    
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="glass-effect fixed top-0 w-full z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl md:text-3xl font-bold gradient-text">
+                        Emoji & Sticker Studio
+                    </h1>
+                    <div class="flex items-center space-x-4">
+                        <button id="themeToggle" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+                            <span id="themeIcon">🌙</span>
+                        </button>
+                        <button id="randomBtn" class="px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg transition">
+                            Random 🎲
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="pt-20 pb-20">
+            <!-- Search Bar -->
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="searchInput"
+                        placeholder="Search unlimited emojis & stickers..."
+                        class="w-full px-6 py-4 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:border-orange-500 transition text-lg"
+                    >
+                    <button id="searchBtn" class="absolute right-2 top-1/2 transform -translate-y-1/2 p-3 bg-orange-500 rounded-lg hover:bg-orange-600 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button class="category-tab active px-4 py-2 bg-gray-800 rounded-lg transition" data-category="all">All</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="smileys">😊 Smileys</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="animals">🐾 Animals</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="food">🍕 Food</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="travel">✈️ Travel</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="activities">⚽ Activities</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="objects">📱 Objects</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="symbols">❤️ Symbols</button>
+                    <button class="category-tab px-4 py-2 bg-gray-800 rounded-lg transition" data-category="flags">🏳️ Flags</button>
+                </div>
+            </div>
+
+            <!-- Emoji Grid -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div id="emojiGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                    <!-- Emojis will be populated here -->
+                </div>
+                
+                <!-- Load More -->
+                <div class="text-center mt-12">
+                    <button id="loadMore" class="px-8 py-3 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full font-semibold hover:from-orange-600 hover:to-pink-600 transition transform hover:scale-105">
+                        Load More ✨
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Sticker Creator -->
+        <div class="fixed bottom-4 right-4 z-50">
+            <button id="stickerBtn" class="w-16 h-16 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full shadow-lg hover:shadow-xl transition transform hover:scale-110">
+                <span class="text-2xl">🎨</span>
+            </button>
+        </div>
+
+        <!-- Sticker Creator Modal -->
+        <div id="stickerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto custom-scrollbar">
+                    <div class="p-6">
+                        <h2 class="text-2xl font-bold mb-4 gradient-text">Create Custom Sticker</h2>
+                        
+                        <!-- Canvas -->
+                        <canvas id="stickerCanvas" width="300" height="300" class="border border-gray-600 rounded-lg mx-auto block"></canvas>
+                        
+                        <div class="mt-4 space-y-4">
+                            <input type="text" id="stickerText" placeholder="Enter sticker text..." class="w-full px-4 py-2 bg-gray-700 rounded-lg">
+                            
+                            <div class="flex gap-2">
+                                <input type="color" id="colorPicker" value="#ff6b35" class="w-12 h-12 rounded cursor-pointer">
+                                <select id="fontSelector" class="flex-1 px-4 py-2 bg-gray-700 rounded-lg">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Comic Sans MS">Comic Sans</option>
+                                    <option value="Impact">Impact</option>
+                                    <option value="Georgia">Georgia</option>
+                                </select>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <button id="addEmojiToSticker" class="flex-1 px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition">Add Emoji</button>
+                                <button id="downloadSticker" class="flex-1 px-4 py-2 bg-orange-500 rounded-lg hover:bg-orange-600 transition">Download</button>
+                            </div>
+                        </div>
+                        
+                        <button id="closeModal" class="absolute top-4 right-4 text-2xl hover:text-orange-500 transition">×</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Emojis -->
+        <div class="fixed bottom-20 left-4 glass-effect rounded-xl p-4 hidden md:block">
+            <h3 class="text-sm font-semibold mb-2 text-gray-300">Recent</h3>
+            <div id="recentEmojis" class="flex gap-2">
+                <!-- Recent emojis will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Emoji Database
+        const emojiDatabase = {
+            smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'],
+            animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊️', '🐇', '🦝', '🦨', '🦡', '🦫', '🦦', '🦥', '🐁', '🐀', '🐿️', '🐉', '🐲'],
+            food: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🌽', '🥕', '🥔', '🍠', '🥐', '🥖', '🍞', '🥨', '🧀', '🥚', '🍳', '🥞', '🥓', '🥩', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🌮', '🌯', '🥗', '🥘', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕', '🍵', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🍾', '🥄', '🍴', '🍽️', '🥣', '🥡', '🥢', '🧂'],
+            travel: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🛴', '🚲', '🛵', '🏍️', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟', '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉', '✈️', '🛫', '🛬', '💺', '🚀', '🛸', '🛰️', '🏖️', '🏕️', '⛺', '🏛️', '🏗️', '🏘️', '🏚️', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏯', '🏰', '💒', '🗼', '🗽', '⛪', '🕌', '🛕', '🕍', '⛩️', '🕋', '⛲', '⛺', '🌁', '🌃', '🌄', '🌅', '🌆', '🌇', '🌉', '♨️', '🌌', '🎠', '🎡', '🎢', '💈', '🎪', '🚂', '🚃', '🚄', '🚅', '🚆', '🚇', '🚈', '🚉', '🚊', '🚝', '🚞', '🚋', '🚌', '🚍', '🚎', '🚐', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🚚', '🚛', '🚜', '🚲', '🛴', '🛵', '🏍️', '🏎️', '🚏', '🛣️', '🛤️', '⛽', '🚨', '🚥', '🚦', '🚧', '⚓', '⛵', '🛶', '🚤', '🛳️', '⛴️', '🛥️', '🚢', '✈️', '🛩️', '🛫', '🛬', '💺', '🚁', '🚟', '🚠', '🚡', '🚀', '🛸', '🛰️', '🗿', '🛂', '🛃', '🛄', '🛅', '🚪', '🛏️', '🛋️', '🚽', '🚿', '🛁', '🚿', '🛀', '🧴', '🧷', '🧹', '🧺', '🧻', '🧼', '🧽', '🛎️', '🧳', '⌛', '⏳', '⌚', '⏰', '⏱️', '⏲️', '🕰️', '🕛', '🕧', '🕐', '🕜', '🕑', '🕝', '🕒', '🕞', '🕓', '🕟', '🕔', '🕠', '🕕', '🕡', '🕖', '🕢', '🕗', '🕣', '🕘', '🕤', '🕙', '🕥', '🕚', '🕦', '🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘', '🌙', '🌚', '🌛', '🌜', '☀️', '🌞', '⭐', '🌟', '🌠', '☁️', '⛅', '⛈️', '🌤️', '🌥️', '🌦️', '🌧️', '🌨️', '🌩️', '🌪️', '🌫️', '🌬️', '🌀', '🌈', '🌂', '☂️', '☔', '⚡', '❄️', '☃️', '⛄', '☄️', '🔥', '💧', '🌊'],
+            activities: ['⚽', '⚾', '🥎', '🏀', '🏐', '🏈', '🏉', '🎾', '🥏', '🎱', '🪀', '🏓', '🏸', '🥅', '⛳', '🪁', '🏏', '🏑', '🏒', '🥍', '🏎️', '🏍️', '🤸', '🤼', '🤺', '🤾', '🤹', '🧗', '🧘', '🏊', '🏄', '🚣', '🏇', '🚴', '🚵', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '🎯', '🎳', '🎮', '🎰', '🧩', '🃏', '🀄', '🎴'],
+            objects: ['⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '⏱️', '⏲️', '⏰', '🕰️', '🌡️', '💈', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '💰', '💳', '💎', '⚖️', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🔩', '⚙️', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '📢', '📣', '📯', '🎵', '🎶', '💽', '💿', '📻', '🎧', '📱', '☎️', '📞', '📟', '📠', '🔋', '🔌', '💻', '🖥️', '🖨️', '🖱️', '🖲️', '💽', '💾', '💿', '📀', '🧮', '🎥', '📹', '📼', '💳', '💸', '💰', '💎', '🔍', '🔎', '🔒', '🔓', '🔏', '🔐', '🔑', '🗝️', '🪓', '⛏️', '⚒️', '🛠️', '🗡️', '⚔️', '💣', '🧨', '🪃', '🏹', '🛡️', '🪚', '🔧', '🪛', '🔨', '🪝', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🪑', '🛏️', '🛋️', '🪑', '🚪', '🪟', '🛏️', '🛋️', '🚪', '🪑', '🚽', '🪠', '🚿', '🛁', '🪤', '🧴', '🧷', '🧹', '🧺', '🧻', '🧼', '🧽', '🪒', '🧻', '🧼', '🧽', '🧴', '🧹', '🧺', '🧷', '🧸', '🪆', '🖼️', '🪞', '🪟', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🎊', '🎉', '🎎', '🏮', '🎐', '🧧', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', '📪', '📫', '📬', '📭', '📮', '📯', '📜', '📃', '📄', '📑', '🧾', '📊', '📈', '📉', '🗒️', '🗓️', '📆', '📅', '🗑️', '📇', '🗃️', '🗳️', '🗄️', '📋', '📁', '📂', '🗂️', '🗞️', '📰', '📓', '📔', '📒', '📕', '📗', '📘', '📙', '📚', '📖', '🔖', '🧷', '📐', '📏', '📌', '📍', '✂️', '🖊️', '🖋️', '✒️', '🖌️', '🖍️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔒', '🔓', '❤️', '💜', '💙', '💚', '💛', '🧡', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❕', '❓', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹', '🛗', '♿', '🅿️', '🚾', '🚻', '🚹', '🚺', '🚼', '🚮', '🚰', '🛂', '🛃', '🛄', '🛅', '🚹', '🚺', '🚼', '🚮', '🚰', '🛂', '🛃', '🛄', '🛅', '🚸', '⚠️', '🚳', '🚭', '🔞', '📵', '🚯', '🚱', '🚷', '🚰', '♿', '🅿️', '🛗', '🚾', '🚮', '🚰', '🛂', '🛃', '🛄', '🛅', '🚹', '🚺', '🚼', '🚮', '🚰', '🛂', '🛃', '🛄', '🛅'],
+            flags: ['🏳️', '🏴', '🏁', '🚩', '🏳️‍🌈', '🏴‍☠️', '🇦🇫', '🇦🇽', '🇦🇱', '🇩🇿', '🇦🇸', '🇦🇩', '🇦🇴', '🇦🇮', '🇦🇶', '🇦🇬', '🇦🇷', '🇦🇲', '🇦🇼', '🇦🇺', '🇦🇹', '🇦🇿', '🇧🇸', '🇧🇭', '🇧🇩', '🇧🇧', '🇧🇾', '🇧🇪', '🇧🇿', '🇧🇯', '🇧🇲', '🇧🇹', '🇧🇴', '🇧🇦', '🇧🇼', '🇧🇷', '🇮🇴', '🇻🇬', '🇧🇳', '🇧🇬', '🇧🇫', '🇧🇮', '🇰🇭', '🇨🇲', '🇨🇦', '🇮🇨', '🇨🇻', '🇧🇶', '🇰🇾', '🇨🇫', '🇹🇩', '🇨🇱', '🇨🇳', '🇨🇽', '🇨🇨', '🇨🇴', '🇰🇲', '🇨🇬', '🇨🇩', '🇨🇰', '🇨🇷', '🇨🇮', '🇭🇷', '🇨🇺', '🇨🇼', '🇨🇾', '🇨🇿', '🇩🇰', '🇩🇯', '🇩🇲', '🇩🇴', '🇪🇨', '🇪🇬', '🇸🇻', '🇬🇶', '🇪🇷', '🇪🇪', '🇪🇹', '🇪🇺', '🇫🇰', '🇫🇴', '🇫🇯', '🇫🇮', '🇫🇷', '🇬🇫', '🇵🇫', '🇹🇫', '🇬🇦', '🇬🇲', '🇬🇪', '🇩🇪', '🇬🇭', '🇬🇮', '🇬🇷', '🇬🇱', '🇬🇩', '🇬🇵', '🇬🇺', '🇬🇹', '🇬🇬', '🇬🇳', '🇬🇼', '🇬🇾', '🇭🇹', '🇭🇳', '🇭🇰', '🇭🇺', '🇮🇸', '🇮🇳', '🇮🇩', '🇮🇷', '🇮🇶', '🇮🇪', '🇮🇲', '🇮🇱', '🇮🇹', '🇯🇲', '🇯🇵', '🇯🇪', '🇯🇴', '🇰🇿', '🇰🇪', '🇰🇮', '🇽🇰', '🇰🇼', '🇰🇬', '🇱🇦', '🇱🇻', '🇱🇧', '🇱🇸', '🇱🇷', '🇱🇾', '🇱🇮', '🇱🇹', '🇱🇺', '🇲🇴', '🇲🇬', '🇲🇼', '🇲🇾', '🇲🇻', '🇲🇱', '🇲🇹', '🇲🇭', '🇲🇶', '🇲🇷', '🇲🇺', '🇾🇹', '🇲🇽', '🇫🇲', '🇲🇩', '🇲🇨', '🇲🇳', '🇲🇪', '🇲🇸', '🇲🇦', '🇲🇿', '🇲🇲', '🇳🇦', '🇳🇷', '🇳🇵', '🇳🇱', '🇳🇨', '🇳🇿', '🇳🇮', '🇳🇪', '🇳🇬', '🇳🇺', '🇳🇫', '🇰🇵', '🇲🇰', '🇳🇴', '🇴🇲', '🇵🇰', '🇵🇼', '🇵🇸', '🇵🇦', '🇵🇬', '🇵🇾', '🇵🇪', '🇵🇭', '🇵🇳', '🇵🇱', '🇵🇹', '🇵🇷', '🇶🇦', '🇷🇪', '🇷🇴', '🇷🇺', '🇷🇼', '🇼🇸', '🇸🇲', '🇸🇦', '🇸🇳', '🇷🇸', '🇸🇨', '🇸🇱', '🇸🇬', '🇸🇽', '🇸🇰', '🇸🇮', '🇬🇸', '🇸🇧', '🇸🇴', '🇿🇦', '🇰🇷', '🇸🇸', '🇪🇸', '🇱🇰', '🇧🇱', '🇸🇭', '🇰🇳', '🇱🇨', '🇵🇲', '🇻🇨', '🇸🇩', '🇸🇷', '🇸🇿', '🇸🇪', '🇨🇭', '🇸🇾', '🇹🇼', '🇹🇯', '🇹🇿', '🇹🇭', '🇹🇱', '🇹🇬', '🇹🇰', '🇹🇴', '🇹🇹', '🇹🇳', '🇹🇷', '🇹🇲', '🇹🇨', '🇹🇻', '🇻🇮', '🇺🇬', '🇺🇦', '🇦🇪', '🇬🇧', '🇺🇸', '🇺🇾', '🇺🇿', '🇻🇺', '🇻🇦', '🇻🇪', '🇻🇳', '🇼🇫', '🇪🇭', '🇾🇪', '🇿🇲', '🇿🇼']
+        };
+
+        let currentCategory = 'all';
+        let currentPage = 0;
+        const itemsPerPage = 48;
+        let recentEmojis = JSON.parse(localStorage.getItem('recentEmojis')) || [];
+        let isDarkMode = localStorage.getItem('darkMode') !== 'false';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadEmojis();
+            loadRecentEmojis();
+            applyTheme();
+            setupStickerCreator();
+            setupScrollIndicator();
+        });
+
+        // Load Emojis
+        function loadEmojis(searchTerm = '') {
+            const grid = document.getElementById('emojiGrid');
+            
+            if (currentPage === 0) {
+                grid.innerHTML = '';
+            }
+
+            let emojis = [];
+            if (searchTerm) {
+                // Search across all categories
+                Object.values(emojiDatabase).forEach(category => {
+                    emojis = emojis.concat(category);
+                });
+                emojis = emojis.filter(emoji => 
+                    emoji.includes(searchTerm) || 
+                    getEmojiName(emoji).toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            } else if (currentCategory === 'all') {
+                Object.values(emojiDatabase).forEach(category => {
+                    emojis = emojis.concat(category);
+                });
+            } else {
+                emojis = emojiDatabase[currentCategory] || [];
+            }
+
+            const start = currentPage * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageEmojis = emojis.slice(start, end);
+
+            pageEmojis.forEach(emoji => {
+                const emojiDiv = document.createElement('div');
+                emojiDiv.className = 'emoji-item bg-gray-800 rounded-xl p-4 flex items-center justify-center text-4xl hover:bg-gray-700 transition cursor-pointer';
+                emojiDiv.textContent = emoji;
+                emojiDiv.addEventListener('click', () => copyEmoji(emoji, emojiDiv));
+                grid.appendChild(emojiDiv);
+            });
+
+            if (pageEmojis.length < itemsPerPage) {
+                document.getElementById('loadMore').style.display = 'none';
+            } else {
+                document.getElementById('loadMore').style.display = 'block';
+            }
+        }
+
+        // Copy Emoji
+        function copyEmoji(emoji, element) {
+            navigator.clipboard.writeText(emoji);
+            
+            // Add recent emoji
+            if (!recentEmojis.includes(emoji)) {
+                recentEmojis.unshift(emoji);
+                if (recentEmojis.length > 8) recentEmojis.pop();
+                localStorage.setItem('recentEmojis', JSON.stringify(recentEmojis));
+                loadRecentEmojis();
+            }
+            
+            // Visual feedback
+            element.classList.add('bounce');
+            setTimeout(() => element.classList.remove('bounce'), 600);
+            
+            // Show floating sticker
+            showFloatingSticker(emoji);
+            
+            // Confetti
+            confetti({
+                particleCount: 50,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // Show Floating Sticker
+        function showFloatingSticker(emoji) {
+            const sticker = document.createElement('div');
+            sticker.className = 'floating-sticker';
+            sticker.textContent = emoji;
+            sticker.style.left = Math.random() * window.innerWidth + 'px';
+            sticker.style.top = window.innerHeight + 'px';
+            document.body.appendChild(sticker);
+            
+            setTimeout(() => sticker.remove(), 3000);
+        }
+
+        // Load Recent Emojis
+        function loadRecentEmojis() {
+            const container = document.getElementById('recentEmojis');
+            container.innerHTML = '';
+            
+            recentEmojis.forEach(emoji => {
+                const emojiDiv = document.createElement('div');
+                emojiDiv.className = 'text-2xl cursor-pointer hover:scale-125 transition';
+                emojiDiv.textContent = emoji;
+                emojiDiv.addEventListener('click', () => copyEmoji(emoji, emojiDiv));
+                container.appendChild(emojiDiv);
+            });
+        }
+
+        // Category Tabs
+        document.querySelectorAll('.category-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                currentCategory = this.dataset.category;
+                currentPage = 0;
+                loadEmojis();
+            });
+        });
+
+        // Search
+        document.getElementById('searchInput').addEventListener('input', function() {
+            currentPage = 0;
+            loadEmojis(this.value);
+        });
+
+        // Load More
+        document.getElementById('loadMore').addEventListener('click', function() {
+            currentPage++;
+            loadEmojis(document.getElementById('searchInput').value);
+        });
+
+        // Random Emoji
+        document.getElementById('randomBtn').addEventListener('click', function() {
+            const allEmojis = Object.values(emojiDatabase).flat();
+            const randomEmoji = allEmojis[Math.floor(Math.random() * allEmojis.length)];
+            
+            // Create modal with random emoji
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-800 rounded-2xl p-8 text-center">
+                    <div class="text-8xl mb-4 animate-bounce">${randomEmoji}</div>
+                    <p class="text-sm text-gray-400">Click to copy</p>
+                </div>
+            `;
+            modal.addEventListener('click', () => {
+                navigator.clipboard.writeText(randomEmoji);
+                modal.remove();
+            });
+            document.body.appendChild(modal);
+            setTimeout(() => modal.remove(), 3000);
+        });
+
+        // Theme Toggle
+        document.getElementById('themeToggle').addEventListener('click', function() {
+            isDarkMode = !isDarkMode;
+            localStorage.setItem('darkMode', isDarkMode);
+            applyTheme();
+        });
+
+        function applyTheme() {
+            const root = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            
+            if (isDarkMode) {
+                root.style.setProperty('--bg-primary', '#0f0f0f');
+                root.style.setProperty('--bg-secondary', '#1a1a1a');
+                root.style.setProperty('--text', '#ffffff');
+                root.style.setProperty('--text-secondary', '#a1a1aa');
+                themeIcon.textContent = '☀️';
+            } else {
+                root.style.setProperty('--bg-primary', '#ffffff');
+                root.style.setProperty('--bg-secondary', '#f5f5f5');
+                root.style.setProperty('--text', '#000000');
+                root.style.setProperty('--text-secondary', '#666666');
+                themeIcon.textContent = '🌙';
+            }
+        }
+
+        // Sticker Creator
+        function setupStickerCreator() {
+            const canvas = document.getElementById('stickerCanvas');
+            const ctx = canvas.getContext('2d');
+            const modal = document.getElementById('stickerModal');
+            
+            document.getElementById('stickerBtn').addEventListener('click', () => {
+                modal.classList.remove('hidden');
+                drawSticker();
+            });
+            
+            document.getElementById('closeModal').addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+            
+            document.getElementById('stickerText').addEventListener('input', drawSticker);
+            document.getElementById('colorPicker').addEventListener('input', drawSticker);
+            document.getElementById('fontSelector').addEventListener('change', drawSticker);
+            
+            function drawSticker() {
+                const text = document.getElementById('stickerText').value || 'Hello!';
+                const color = document.getElementById('colorPicker').value;
+                const font = document.getElementById('fontSelector').value;
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Background
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.roundRect(10, 10, 280, 280, 20);
+                ctx.fill();
+                
+                // Text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold 24px ${font}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 150, 150);
+            }
+            
+            document.getElementById('addEmojiToSticker').addEventListener('click', () => {
+                const emojis = Object.values(emojiDatabase).flat();
+                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                document.getElementById('stickerText').value += randomEmoji;
+                drawSticker();
+            });
+            
+            document.getElementById('downloadSticker').addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.download = 'sticker.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        // Scroll Indicator
+        function setupScrollIndicator() {
+            window.addEventListener('scroll', () => {
+                const scrollProgress = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+                document.getElementById('scrollIndicator').style.transform = `scaleX(${scrollProgress})`;
+            });
+        }
+
+        // Get emoji name (simplified)
+        function getEmojiName(emoji) {
+            const names = {
+                '😀': 'grinning',
+                '😃': 'smiley',
+                '😄': 'smile',
+                '😁': 'grin',
+                '😆': 'laughing',
+                '😅': 'sweat_smile',
+                '🤣': 'rofl',
+                '😂': 'joy',
+                '🙂': 'slightly_smiling',
+                '🙃': 'upside_down',
+                '😉': 'wink',
+                '😊': 'blush',
+                '😇': 'innocent',
+                '🥰': 'smiling_face_hearts',
+                '😍': 'heart_eyes',
+                '🤩': 'star_struck',
+                '😘': 'kissing_heart',
+                '😗': 'kissing',
+                '😚': 'kissing_closed_eyes',
+                '😙': 'kissing_smiling_eyes',
+                '😋': 'yum',
+                '😛': 'stuck_out_tongue',
+                '😜': 'stuck_out_tongue_winking_eye',
+                '🤪': 'zany_face',
+                '😝': 'stuck_out_tongue_closed_eyes',
+                '🤑': 'money_mouth',
+                '🤗': 'hugging',
+                '🤭': 'hand_over_mouth',
+                '🤫': 'shushing',
+                '🤔': 'thinking',
+                '🤐': 'zipper_mouth',
+                '🤨': 'raised_eyebrow',
+                '😐': 'neutral_face',
+                '😑': 'expressionless',
+                '😶': 'no_mouth',
+                '😏': 'smirk',
+                '😒': 'unamused',
+                '🙄': 'roll_eyes',
+                '😬': 'grimacing',
+                '🤥': 'lying_face',
+                '😌': 'relieved',
+                '😔': 'pensive',
+                '😪': 'sleepy',
+                '🤤': 'drooling',
+                '😴': 'sleeping',
+                '😷': 'mask',
+                '🤒': 'face_with_thermometer',
+                '🤕': 'face_with_head_bandage',
+                '🤢': 'nauseated',
+                '🤮': 'vomiting',
+                '🤧': 'sneezing',
+                '🥵': 'hot_face',
+                '🥶': 'cold_face',
+                '🥴': 'woozy',
+                '😵': 'dizzy',
+                '🤯': 'exploding_head',
+                '🤠': 'cowboy',
+                '🥳': 'partying',
+                '😎': 'sunglasses',
+                '🤓': 'nerd',
+                '🧐': 'monocle',
+                '😕': 'confused',
+                '😟': 'worried',
+                '🙁': 'slightly_frowning',
+                '☹️': 'frowning',
+                '😮': 'open_mouth',
+                '😯': 'hushed',
+                '😲': 'astonished',
+                '😳': 'flushed',
+                '🥺': 'pleading',
+                '😦': 'frowning_open_mouth',
+                '😧': 'anguished',
+                '😨': 'fearful',
+                '😰': 'cold_sweat',
+                '😥': 'disappointed_relieved',
+                '😢': 'cry',
+                '😭': 'sob',
+                '😱': 'scream',
+                '😖': 'confounded',
+                '😣': 'persevere',
+                '😞': 'disappointed',
+                '😓': 'sweat',
+                '😩': 'weary',
+                '😫': 'tired_face',
+                '🥱': 'yawning',
+                '😤': 'triumph',
+                '😡': 'rage',
+                '😠': 'angry',
+                '🤬': 'cursing',
+                '😈': 'smiling_imp',
+                '👿': 'imp',
+                '💀': 'skull',
+                '☠️': 'skull_crossbones',
+                '💩': 'poop',
+                '🤡': 'clown',
+                '👹': 'japanese_ogre',
+                '👺': 'japanese_goblin',
+                '👻': 'ghost',
+                '👽': 'alien',
+                '👾': 'space_invader',
+                '🤖': 'robot',
+                '😺': 'smiling_cat',
+                '😸': 'grinning_cat',
+                '😹': 'joy_cat',
+                '😻': 'heart_eyes_cat',
+                '😼': 'smirk_cat',
+                '😽': 'kissing_cat',
+                '🙀': 'screaming_cat',
+                '😿': 'crying_cat',
+                '😾': 'pouting_cat',
+                '🙈': 'see_no_evil',
+                '🙉': 'hear_no_evil',
+                '🙊': 'speak_no_evil'
+            };
+            return names[emoji] || 'emoji';
+        }
+    </script>
+</body>
+</html>
